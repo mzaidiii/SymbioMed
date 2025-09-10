@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
+import 'package:symbiomed/Screens/welcome.dart';
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
-  runApp(MyApp());
+void main() {
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
@@ -13,112 +11,75 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
       title: 'Symbiomed',
       theme: ThemeData(
-        primaryColor: const Color(0xFF347928),
-        scaffoldBackgroundColor: const Color(0xFF347928),
+        colorScheme: const ColorScheme.light(
+          primary: Color(0xFF2E7D32), // main green
+          secondary: Color(0xFF43A047), // button green
+          background: Color(0xFFF1F8F4), // soft green bg
+          surface: Colors.white,
+        ),
+        scaffoldBackgroundColor: const Color(0xFFF1F8F4),
         appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFF347928),
+          backgroundColor: Color(0xFF2E7D32),
           foregroundColor: Colors.white,
+          elevation: 0,
         ),
         cardTheme: CardThemeData(
-          color: const Color(0xFFB8E6A5),
-          elevation: 4,
+          color: Colors.white,
+          elevation: 6,
+          shadowColor: Colors.black26,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFFF4C32C),
-            foregroundColor: Colors.black,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
-            textStyle: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-            ),
+            borderRadius: BorderRadius.circular(16),
           ),
         ),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
-          fillColor: const Color(0xFFF7F2DE),
+          fillColor: Colors.white,
           contentPadding: const EdgeInsets.symmetric(
-            vertical: 16,
-            horizontal: 20,
+            vertical: 14,
+            horizontal: 16,
           ),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide.none,
+            borderSide: BorderSide(color: Colors.grey.shade300),
           ),
-          hintStyle: const TextStyle(color: Color(0xFF111111)),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey.shade300),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Color(0xFF2E7D32), width: 1.5),
+          ),
+          hintStyle: const TextStyle(color: Colors.black45),
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Color(0xFF43A047),
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 24),
+            textStyle: const TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 16,
+            ),
+          ),
         ),
         textTheme: const TextTheme(
           headlineMedium: TextStyle(
-            color: Colors.white,
+            color: Color(0xFF1B1B1B),
             fontWeight: FontWeight.bold,
             fontSize: 24,
           ),
-          bodyMedium: TextStyle(color: Color(0xFF111111), fontSize: 16),
-          bodySmall: TextStyle(color: Color(0xFF111111), fontSize: 14),
-          labelLarge: TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        floatingActionButtonTheme: const FloatingActionButtonThemeData(
-          backgroundColor: Color(0xFFF4C32C),
-          foregroundColor: Colors.black,
+          bodyMedium: TextStyle(color: Color(0xFF1B1B1B), fontSize: 16),
+          bodySmall: TextStyle(color: Colors.black54, fontSize: 14),
         ),
       ),
-      home: const MyHomePage(title: 'Symbiomed Home Page'),
-    );
-  }
-}
-
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-  final String title;
-
-  @override
-  State<MyHomePage> createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
-
-  void _incrementCounter() {
-    setState(() {
-      _counter++;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(widget.title)),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text(
-              'You have pushed the button this many times:',
-              style: TextStyle(color: Colors.white),
-            ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ),
+      home: const Welcome(), // your first page
     );
   }
 }
