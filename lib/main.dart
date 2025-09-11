@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:symbiomed/Screens/welcome.dart';
+import 'package:firebase_core/firebase_core.dart';
 
-void main() {
-  runApp(const MyApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
+  runApp(MyApp());
 }
 
 class MyApp extends StatelessWidget {
@@ -79,7 +82,7 @@ class MyApp extends StatelessWidget {
           bodySmall: TextStyle(color: Colors.black54, fontSize: 14),
         ),
       ),
-      home: const Welcome(), // your first page
+      home: const Welcome(),
     );
   }
 }
