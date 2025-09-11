@@ -27,7 +27,7 @@ class _Login extends State<Login> {
     }
   }
 
-  Future<void> Login() async {
+  Future<void> login() async {
     try {
       await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: email.text.trim(),
@@ -93,7 +93,7 @@ class _Login extends State<Login> {
                         ),
                         const SizedBox(height: 25),
                         ElevatedButton(
-                          onPressed: Login,
+                          onPressed: login,
                           child: Text(
                             'Sign In to potral',
                             style: GoogleFonts.roboto(),
