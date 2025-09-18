@@ -28,8 +28,6 @@ class _NewuserState extends State<Newuser> {
 
   bool _isLoading = false;
   List<Map<String, dynamic>> _lookupResults = [];
-
-  // Base API URL
   final String baseUrl = 'https://symbiomed-api.onrender.com';
 
   Future<String?> _getIdToken() async {
@@ -39,7 +37,7 @@ class _NewuserState extends State<Newuser> {
   }
 
   Future<void> _lookupSymptom(String query) async {
-    print('Lookup called with query: $query');
+    print('Lookup called with query: "$query"');
     if (query.trim().isEmpty) {
       setState(() {
         _lookupResults = [];
@@ -53,69 +51,73 @@ class _NewuserState extends State<Newuser> {
       return;
     }
 
-    final uri = Uri.parse('$baseUrl/lookup').replace(
-      queryParameters: {
-        'q': query,
-        'system': 'http://namaste.gov.in/fhir/CodeSystem/namaste-ayurveda',
-      },
-    );
+    final systems = [
+      'http://namaste.gov.in/fhir/CodeSystem/namaste-ayurveda',
+      'http://namaste.gov.in/fhir/CodeSystem/namaste-siddha',
+      'http://namaste.gov.in/fhir/CodeSystem/namaste-unani',
+    ];
+
+    List<Map<String, dynamic>> allResults = [];
 
     try {
-      final response = await http.get(
-        uri,
-        headers: {'Authorization': 'Bearer $token'},
-      );
+      for (var system in systems) {
+        final uri = Uri.parse(
+          '$baseUrl/lookup',
+        ).replace(queryParameters: {'q': query, 'system': system});
 
-      print('Lookup response status: ${response.statusCode}');
-      print('Lookup response body: ${response.body}');
+        print('Sending GET request to: $uri');
+        final response = await http.get(
+          uri,
+          headers: {'Authorization': 'Bearer $token'},
+        );
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final results = data['results'];
+        print('Response status: ${response.statusCode}');
+        print('Response body: ${response.body}');
 
-        if (results != null &&
-            results['resourceType'] == 'Parameters' &&
-            results['parameter'] != null) {
-          final parameters = results['parameter'] as List<dynamic>;
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+          final results = data['results'];
 
-          String? code;
-          String? display;
+          if (results != null &&
+              results['resourceType'] == 'Parameters' &&
+              results['parameter'] != null) {
+            final parameters = results['parameter'] as List<dynamic>;
 
-          for (final param in parameters) {
-            if (param['name'] == 'code') {
-              code = param['valueCode'];
-            } else if (param['name'] == 'display') {
-              display = param['valueString'];
+            String? code;
+            String? display;
+
+            for (final param in parameters) {
+              if (param['name'] == 'code') {
+                code = param['valueCode'];
+              } else if (param['name'] == 'display') {
+                display = param['valueString'];
+              }
             }
-          }
 
-          if (code != null && display != null) {
-            setState(() {
-              _lookupResults = [
-                {'code': code, 'display': display},
-              ];
-            });
+            if (code != null && display != null) {
+              allResults.add({'code': code, 'display': display});
+            }
           } else {
-            setState(() {
-              _lookupResults = [];
-            });
+            print('No valid parameters found in response for system $system');
           }
-        } else if (results != null &&
-            results['resourceType'] == 'OperationOutcome') {
-          setState(() {
-            _lookupResults = [];
-          });
+        } else if (response.statusCode == 401) {
+          _showError('Unauthorized. Please login again.');
+          return;
         } else {
-          setState(() {
-            _lookupResults = [];
-          });
+          print('Lookup failed with status: ${response.statusCode}');
         }
-      } else if (response.statusCode == 401) {
-        _showError('Unauthorized. Please login again.');
-      } else {
-        _showError('Lookup failed: ${response.statusCode}');
       }
-    } catch (e) {
+
+      setState(() {
+        _lookupResults = allResults;
+      });
+
+      if (allResults.isEmpty) {
+        print('No results found for query "$query" in any system.');
+      }
+    } catch (e, stacktrace) {
+      print('Exception during lookup: $e');
+      print(stacktrace);
       _showError('Lookup error: $e');
     }
   }
@@ -134,10 +136,139 @@ class _NewuserState extends State<Newuser> {
     }
 
     final url = Uri.parse('$baseUrl/translate');
-    final body = json.encode({
-      "code": namasteCode,
-      "system": "http://namaste.gov.in/fhir/CodeSystem/namaste-ayurveda",
-      "target": "http://id.who.int/icd/release/11/mms",
+    final systems = [
+      'http://namaste.gov.in/fhir/CodeSystem/namaste-ayurveda',
+      'http://namaste.gov.in/fhir/CodeSystem/namaste-siddha',
+      'http://namaste.gov.in/fhir/CodeSystem/namaste-unani',
+    ];
+
+    List<String> tm2Codes = [];
+
+    for (var system in systems) {
+      final body = json.encode({
+        "code": namasteCode,
+        "system": system,
+        "target": "http://id.who.int/icd/release/11/mms",
+      });
+
+      final headers = {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      };
+
+      print('Translate POST request to: $url');
+      print('Request headers: $headers');
+      print('Request body: $body');
+
+      try {
+        final response = await http.post(url, headers: headers, body: body);
+
+        print('Response status: ${response.statusCode}');
+        print('Response body: ${response.body}');
+
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+          final result = data['result'];
+
+          if (result == null) {
+            if (data['result'] != null &&
+                data['result']['resourceType'] == 'OperationOutcome') {
+              continue;
+            } else {
+              _showError('Unexpected response format from server.');
+              return;
+            }
+          }
+
+          if (result['resourceType'] == 'Parameters' &&
+              result['parameter'] != null) {
+            final parameters = result['parameter'] as List<dynamic>;
+
+            for (var param in parameters) {
+              if (param['name'] == 'match' && param['part'] != null) {
+                final parts = param['part'] as List<dynamic>;
+                final concept = parts.firstWhere(
+                  (p) => p['name'] == 'concept' && p['valueCoding'] != null,
+                  orElse: () => null,
+                );
+                if (concept != null) {
+                  final code = concept['valueCoding']['code']?.toString() ?? '';
+                  if (code.isNotEmpty) {
+                    tm2Codes.add(code);
+                  }
+                }
+              }
+            }
+
+            if (tm2Codes.isNotEmpty) {
+              setState(() {
+                _tm2Controller.text = tm2Codes.join('\n');
+              });
+              return;
+            }
+          }
+        } else if (response.statusCode == 401) {
+          _showError('Unauthorized. Please login again.');
+          return;
+        } else {
+          print('Translate failed with status: ${response.statusCode}');
+        }
+      } catch (e) {
+        print('Translate error: $e');
+      }
+    }
+    if (tm2Codes.isEmpty) {
+      _showError('No translation found for code "$namasteCode" in any system.');
+    }
+  }
+
+  Future<void> _savePatientDetails() async {
+    if (_fullNameController.text.trim().isEmpty) {
+      _showError('Full Name is required');
+      return;
+    }
+    if (_ageController.text.trim().isEmpty) {
+      _showError('Age is required');
+      return;
+    }
+    if (_gender == null) {
+      _showError('Please select a gender');
+      return;
+    }
+    if (_namasteController.text.trim().isEmpty) {
+      _showError('Please select a NAMASTE code');
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    final token = await _getIdToken();
+    if (token == null) {
+      _showError('User  not authenticated');
+      setState(() {
+        _isLoading = false;
+      });
+      return;
+    }
+
+    final url = Uri.parse('$baseUrl/fhir/Bundle'); // Adjust endpoint if needed
+
+    final body = jsonEncode({
+      'fullName': _fullNameController.text.trim(),
+      'age': int.tryParse(_ageController.text.trim()) ?? 0,
+      'gender': _gender,
+      'height': double.tryParse(_heightController.text.trim()) ?? 0,
+      'weight': double.tryParse(_weightController.text.trim()) ?? 0,
+      'symptom': _symptomController.text.trim(),
+      'namasteCode': _namasteController.text.trim(),
+      'tm2Code': _tm2Controller.text.trim(),
+      'notes': _notesController.text.trim(),
+      'date': _selectedDate?.toIso8601String(),
+      'time': _selectedTime != null
+          ? '${_selectedTime!.hour.toString().padLeft(2, '0')}:${_selectedTime!.minute.toString().padLeft(2, '0')}'
+          : null,
     });
 
     try {
@@ -150,169 +281,21 @@ class _NewuserState extends State<Newuser> {
         body: body,
       );
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data['resourceType'] == 'Parameters' && data['parameter'] != null) {
-          final matches = data['parameter']
-              .where((p) => p['name'] == 'match')
-              .toList();
-
-          if (matches.isNotEmpty) {
-            final concept = matches[0]['part'].firstWhere(
-              (part) => part['name'] == 'concept',
-              orElse: () => null,
-            );
-            if (concept != null && concept['valueCoding'] != null) {
-              final tm2Code = concept['valueCoding']['code'] ?? '';
-              setState(() {
-                _tm2Controller.text = tm2Code;
-              });
-              return;
-            }
-          }
-        }
-        _showError('No translation found');
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        _showSuccess('Patient details saved successfully');
+        // Optionally clear fields or navigate away
       } else if (response.statusCode == 401) {
         _showError('Unauthorized. Please login again.');
       } else {
-        _showError('Translate failed: ${response.statusCode}');
+        _showError('Failed to save patient details: ${response.statusCode}');
       }
     } catch (e) {
-      _showError('Translate error: $e');
-    }
-  }
-
-  Future<void> _savePatientDetails() async {
-    final fullName = _fullNameController.text.trim();
-    final ageStr = _ageController.text.trim();
-    final gender = _gender;
-    final heightStr = _heightController.text.trim();
-    final weightStr = _weightController.text.trim();
-    final symptom = _symptomController.text.trim();
-    final namasteCode = _namasteController.text.trim();
-    final tm2Code = _tm2Controller.text.trim();
-    final notes = _notesController.text.trim();
-
-    if (fullName.isEmpty ||
-        ageStr.isEmpty ||
-        gender == null ||
-        namasteCode.isEmpty ||
-        tm2Code.isEmpty ||
-        _selectedDate == null ||
-        _selectedTime == null) {
-      _showError('Please fill all required fields and select date/time');
-      return;
-    }
-
-    final age = int.tryParse(ageStr);
-    final height = double.tryParse(heightStr);
-    final weight = double.tryParse(weightStr);
-
-    if (age == null) {
-      _showError('Invalid age');
-      return;
-    }
-
-    final token = await _getIdToken();
-    if (token == null) {
-      _showError('User  not authenticated');
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-    });
-
-    final patientId = fullName.toLowerCase().replaceAll(' ', '_') + '_id';
-
-    final bundle = {
-      "resourceType": "Bundle",
-      "type": "collection",
-      "entry": [
-        {
-          "resource": {
-            "resourceType": "Patient",
-            "id": patientId,
-            "name": [
-              {
-                "given": [fullName.split(' ').first],
-                "family": fullName.split(' ').length > 1
-                    ? fullName.split(' ').sublist(1).join(' ')
-                    : '',
-              },
-            ],
-            "gender": gender.toLowerCase(),
-            "birthDate": _calculateBirthDate(age),
-          },
-        },
-        {
-          "resource": {
-            "resourceType": "Encounter",
-            "id": "enc_${DateTime.now().millisecondsSinceEpoch}",
-            "status": "finished",
-            "class": {
-              "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
-              "code": "AMB",
-              "display": "ambulatory",
-            },
-          },
-        },
-        {
-          "resource": {
-            "resourceType": "Condition",
-            "id": "cond_${DateTime.now().millisecondsSinceEpoch}",
-            "code": {
-              "coding": [
-                {
-                  "system":
-                      "http://namaste.gov.in/fhir/CodeSystem/namaste-ayurveda",
-                  "code": namasteCode,
-                  "display": symptom.isNotEmpty ? symptom : "NAMASTE code",
-                },
-              ],
-            },
-            "note": [
-              {"text": notes},
-            ],
-          },
-        },
-      ],
-    };
-
-    final url = Uri.parse('$baseUrl/fhir/Bundle?dryRun=true');
-
-    try {
-      final response = await http.post(
-        url,
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-        body: json.encode(bundle),
-      );
-
-      if (response.statusCode == 201 || response.statusCode == 200) {
-        _showSuccess('Patient details saved successfully (dry run)');
-      } else if (response.statusCode == 401) {
-        _showError('Unauthorized. Please login again.');
-      } else if (response.statusCode == 400) {
-        _showError('Bad request. Please check your data.');
-      } else {
-        _showError('Save failed: ${response.statusCode}');
-      }
-    } catch (e) {
-      _showError('Save error: $e');
+      _showError('Error saving patient details: $e');
     } finally {
       setState(() {
         _isLoading = false;
       });
     }
-  }
-
-  String _calculateBirthDate(int age) {
-    final now = DateTime.now();
-    final birthYear = now.year - age;
-    return DateTime(birthYear, 1, 1).toIso8601String().split('T').first;
   }
 
   void _showError(String message) {
@@ -338,6 +321,32 @@ class _NewuserState extends State<Newuser> {
     _tm2Controller.dispose();
     _notesController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickDate(BuildContext context) async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(1900),
+      lastDate: DateTime(2100),
+    );
+    if (picked != null) {
+      setState(() {
+        _selectedDate = picked;
+      });
+    }
+  }
+
+  Future<void> _pickTime(BuildContext context) async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.now(),
+    );
+    if (picked != null) {
+      setState(() {
+        _selectedTime = picked;
+      });
+    }
   }
 
   @override
@@ -603,31 +612,5 @@ class _NewuserState extends State<Newuser> {
         ),
       ),
     );
-  }
-
-  Future<void> _pickDate(BuildContext context) async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: DateTime.now(),
-      firstDate: DateTime(1900),
-      lastDate: DateTime(2100),
-    );
-    if (picked != null) {
-      setState(() {
-        _selectedDate = picked;
-      });
-    }
-  }
-
-  Future<void> _pickTime(BuildContext context) async {
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.now(),
-    );
-    if (picked != null) {
-      setState(() {
-        _selectedTime = picked;
-      });
-    }
   }
 }
