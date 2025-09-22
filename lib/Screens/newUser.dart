@@ -246,29 +246,63 @@ class _NewuserState extends State<Newuser> {
 
     final token = await _getIdToken();
     if (token == null) {
-      _showError('User  not authenticated');
+      _showError('User not authenticated');
       setState(() {
         _isLoading = false;
       });
       return;
     }
 
-    final url = Uri.parse('$baseUrl/fhir/Bundle'); // Adjust endpoint if needed
+    final url = Uri.parse('$baseUrl/fhir/Bundle');
 
+    // --- build FHIR bundle ---
     final body = jsonEncode({
-      'fullName': _fullNameController.text.trim(),
-      'age': int.tryParse(_ageController.text.trim()) ?? 0,
-      'gender': _gender,
-      'height': double.tryParse(_heightController.text.trim()) ?? 0,
-      'weight': double.tryParse(_weightController.text.trim()) ?? 0,
-      'symptom': _symptomController.text.trim(),
-      'namasteCode': _namasteController.text.trim(),
-      'tm2Code': _tm2Controller.text.trim(),
-      'notes': _notesController.text.trim(),
-      'date': _selectedDate?.toIso8601String(),
-      'time': _selectedTime != null
-          ? '${_selectedTime!.hour.toString().padLeft(2, '0')}:${_selectedTime!.minute.toString().padLeft(2, '0')}'
-          : null,
+      "resourceType": "Bundle",
+      "type": "collection",
+      "entry": [
+        {
+          "resource": {
+            "resourceType": "Patient",
+            "id": "pat-${DateTime.now().millisecondsSinceEpoch}",
+            "name": [
+              {
+                "given": [_fullNameController.text.trim()],
+                "family": "", // optional: split last name if you want
+              },
+            ],
+            "gender": _gender,
+            "birthDate": _selectedDate?.toIso8601String().split("T").first,
+          },
+        },
+        {
+          "resource": {
+            "resourceType": "Encounter",
+            "id": "enc-${DateTime.now().millisecondsSinceEpoch}",
+            "status": "finished",
+            "class": {
+              "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+              "code": "AMB",
+              "display": "ambulatory",
+            },
+          },
+        },
+        {
+          "resource": {
+            "resourceType": "Condition",
+            "id": "cond-${DateTime.now().millisecondsSinceEpoch}",
+            "code": {
+              "coding": [
+                {
+                  "system":
+                      "http://namaste.gov.in/fhir/CodeSystem/namaste-ayurveda",
+                  "code": _namasteController.text.trim(),
+                  "display": _symptomController.text.trim(),
+                },
+              ],
+            },
+          },
+        },
+      ],
     });
 
     try {
@@ -283,11 +317,12 @@ class _NewuserState extends State<Newuser> {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         _showSuccess('Patient details saved successfully');
-        // Optionally clear fields or navigate away
       } else if (response.statusCode == 401) {
         _showError('Unauthorized. Please login again.');
       } else {
-        _showError('Failed to save patient details: ${response.statusCode}');
+        _showError(
+          'Failed to save patient details: ${response.statusCode}\n${response.body}',
+        );
       }
     } catch (e) {
       _showError('Error saving patient details: $e');
