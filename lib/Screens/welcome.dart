@@ -16,7 +16,7 @@ class Welcome extends StatelessWidget {
             child: Container(
               width: 200,
               height: 200,
-              child: LottieBuilder.asset('android/assets/welcom.json'),
+              child: LottieBuilder.asset('assets/welcom.json'),
             ),
           ),
           const SizedBox(height: 15),

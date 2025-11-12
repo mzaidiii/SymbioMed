@@ -39,7 +39,7 @@ class _HomePageState extends State<HomePage> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Image.asset('android/assets/logo.png', height: 150),
+                Image.asset('assets/logo.png', height: 150),
                 const SizedBox(height: 15),
                 TextField(
                   controller: abha,

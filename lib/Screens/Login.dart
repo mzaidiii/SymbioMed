@@ -63,7 +63,7 @@ class _Login extends State<Login> {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Image.asset('android/assets/logo.png', height: 150),
+                Image.asset('assets/logo.png', height: 150),
                 const SizedBox(height: 10),
                 Card(
                   elevation: 5,
